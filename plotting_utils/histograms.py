@@ -2,9 +2,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-def _balance_pos_neg(labels, scores):
+def _balance_pos_neg(labels, scores) -> tuple[np.ndarray, np.ndarray]:
     """
     Balance the number of positive and negative examples by downsampling the majority class.
+    
+    Parameters
+    ----------
+    labels : array-like
+        True binary labels (0 or 1).
+    scores : array-like
+        Predicted scores or probabilities.
+        
+    Returns
+    -------
+    balanced_labels : np.ndarray
+        Balanced binary labels.
+    balanced_scores : np.ndarray
+        Balanced predicted scores.
     """
     true_scores = scores[labels == 1]
     false_scores = scores[labels == 0]
@@ -46,6 +60,40 @@ def plot_score_histograms(
     x_lim=None,
     balance_pos_neg: bool = True,
 ):
+    """
+    Plot histograms or KDEs of predicted scores for true and false labels.
+    
+    Parameters
+    ----------
+    labels : array-like
+        True binary labels (0 or 1).
+    scores : array-like
+        Predicted scores or probabilities.
+    n_bins : int
+        Number of bins for the histogram (default: 75).
+    random_state : int
+        Random seed for reproducibility (default: 42).
+    y_log : bool
+        Whether to use a logarithmic scale for the y-axis (default: False).
+    panel_kind : str
+        Type of plot to generate: "hist" for histogram, "kde" for kernel density estimate (default: "kde").
+    density : bool
+        Whether to normalize the histogram to form a probability density (default: False).
+    title : str, optional
+        Title for the figure. If None, no title is set.
+    y_lim : tuple, optional
+        Limits for the y-axis (min, max). If None, automatic limits are used.
+    x_lim : tuple, optional
+        Limits for the x-axis (min, max). If None, automatic limits are used.
+    balance_pos_neg : bool
+        Whether to balance the number of positive and negative examples by downsampling the majority class (default: True).
+        
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The generated figure object.
+    """
+    
     
     fig, ax = plt.subplots(
         nrows=1, 

@@ -30,6 +30,19 @@ _MONTH2PREFIX = {
 _date_pat = re.compile(r"^(\d{1,2})-(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)$", re.IGNORECASE)
 
 def _deexcelize_symbol(sym: str) -> str:
+    """
+    Convert Excel-style date symbols to a standard format.
+    
+    Parameters
+    ----------
+    sym : str
+        The symbol to convert.
+        
+    Returns
+    -------
+    str
+        The converted symbol.
+    """
     s = str(sym).strip()
     m = _date_pat.match(s.upper())
     if not m:
@@ -42,11 +55,38 @@ def _deexcelize_symbol(sym: str) -> str:
 
 
 def _asciify(s: str) -> str:
+    """
+    Convert unicode characters to ASCII equivalents.
+    
+    Parameters
+    ----------
+    s : str
+        The string to convert.
+        
+    Returns
+    -------
+    str
+        The converted string.
+    """
     # strip accents & convert common unicode to ascii-ish
     s = "".join(GREEK_FIX.get(ch, ch) for ch in s)
     return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
 
+
 def _norm_symbol(s: str) -> str:
+    """
+    Normalize a gene symbol by stripping whitespace and converting to uppercase.
+    
+    Parameters
+    ----------
+    s : str
+        The symbol to normalize.
+        
+    Returns
+    -------
+    str
+        The normalized symbol.
+    """
     if s is None or pd.isna(s):
         return ""
     s = str(s).strip()
@@ -58,17 +98,39 @@ def _norm_symbol(s: str) -> str:
     s = s.upper()
     return s
 
-def _split_synonyms(s: str):
+
+def _split_synonyms(s: str) -> list[str]:
+    """
+    Split a string of gene synonyms into a list of individual synonyms.
+    
+    Parameters
+    ----------
+    s : str
+        The string of synonyms to split.
+        
+    Returns
+    -------
+    list[str]
+        A list of individual synonyms.
+    """
     if pd.isna(s) or not str(s).strip():
         return []
     # NCBI uses | between synonyms; also split commas if present
     parts = re.split(r"[|,;/]", str(s))
     return [p.strip() for p in parts if p.strip() and p.strip() != "-"]
 
+
 class GeneCanonicalizer:
     """
     Canonicalizes gene identifiers (Ensembl, Entrez, aliases) to a preferred symbol
     using local files (GTF + NCBI/MGI gene_info). Species-agnostic; pass the correct files.
+    
+    Parameters
+    ----------
+    species : str
+        Species identifier (e.g., "10090" for mouse, "9606" for human).
+    use_mygene : bool
+        Whether to use MyGene.info for fallback symbol resolution (default: True).
     """
     def __init__(self, species: str = "10090", use_mygene: bool = True):
         self.ens2sym = {}      # ENSMUSG000000... -> OFFICIAL_SYMBOL
@@ -88,6 +150,14 @@ class GeneCanonicalizer:
         }
 
     def load_gtf(self, gtf_path: str):
+        """
+        Load Ensembl GTF file to build Ensembl -> official symbol mapping.
+        
+        Parameters
+        ----------
+        gtf_path : str
+            Path to the GTF file (can be gzipped).
+        """
         # read only 'gene' rows: attributes have gene_id and gene_name
         openf = gzip.open if gtf_path.endswith(".gz") else open
         with openf(gtf_path, "rt") as f:
@@ -107,10 +177,17 @@ class GeneCanonicalizer:
                         self.ens2sym[ens] = sym
                         self.sym_ok.add(sym)
 
+
     def load_ncbi_gene_info(self, gene_info_path: str, species_taxid="10090"):
         """
-        NCBI gene_info format:
-        tax_id GeneID Symbol LocusTag Synonyms dbXrefs chromosome map_location description type_of_gene ... (tab-separated)
+        Load NCBI gene_info file to build Entrez -> official symbol and alias -> official symbol mappings.
+        
+        Parameters
+        ----------
+        gene_info_path : str
+            Path to the gene_info file (can be gzipped).
+        species_taxid : str
+            NCBI taxonomy ID for the species (default: "10090" for mouse).
         """
         openf = gzip.open if gene_info_path.endswith(".gz") else open
         with openf(gene_info_path, "rt", errors="ignore") as f:
@@ -139,8 +216,24 @@ class GeneCanonicalizer:
                         if ens:
                             self.ens2sym[ens] = sym
 
+
     def canonicalize_series(self, s: pd.Series, batch_size: int = 5000) -> pd.Series:
-        """Fast path: local maps first; optional batched MyGene fallback for unresolved."""
+        """
+        Canonicalize a pandas Series of gene identifiers to official symbols.
+        
+        Parameters
+        ----------
+        s : pd.Series
+            Series of gene identifiers (symbols, Ensembl IDs, Entrez IDs, aliases).
+        batch_size : int
+            Batch size for MyGene.info queries (default: 5000).
+            
+        Returns
+        -------
+        pd.Series
+            Series of canonicalized official symbols.
+        """
+        
         # 1) normalize input
         s_norm = s.astype(str).map(_norm_symbol)
 
@@ -202,7 +295,22 @@ class GeneCanonicalizer:
 
         return out
     
+    
     def canonical_symbol(self, s: str) -> str:
+        """
+        Canonicalize a single gene identifier to an official symbol.
+        
+        Parameters
+        ----------
+        s : str
+            Gene identifier (symbol, Ensembl ID, Entrez ID, alias).
+            
+        Returns
+        -------
+        str
+            Canonicalized official symbol, or empty string if unmappable.
+        """
+        
         s0 = _norm_symbol(s)
         if not s0:
             return ""
@@ -263,7 +371,25 @@ class GeneCanonicalizer:
         # fallback: return normalized original
         return s0
 
+
     def standardize_df(self, df: pd.DataFrame, tf_col: str, tg_col: str) -> pd.DataFrame:
+        """
+        Canonicalize gene identifiers in a DataFrame.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Input DataFrame.
+        tf_col : str
+            Column name for transcription factors.
+        tg_col : str
+            Column name for target genes.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with canonicalized gene identifiers.
+        """
         out = df.copy()
         out[tf_col] = self.canonicalize_series(out[tf_col])
         out[tg_col] = self.canonicalize_series(out[tg_col])
@@ -274,7 +400,16 @@ class GeneCanonicalizer:
             print(f"[Canonicalizer] Dropped {dropped} rows with empty/unmappable TF/TG")
         return out
 
+
     def coverage_report(self):
+        """
+        Generate a coverage report for the canonicalizer.
+
+        Returns
+        -------
+        dict
+            Dictionary containing coverage statistics.
+        """
         return {
             "n_official": len(self.sym_ok),
             "n_ens2sym": len(self.ens2sym),

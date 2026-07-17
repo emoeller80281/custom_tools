@@ -9,16 +9,41 @@ from sklearn.metrics import (
 )
 
 def compute_binary_classification_metrics(
-    labels,
-    scores,
+    labels: np.ndarray | list,
+    scores: np.ndarray | list,
     score_threshold: float = 0.5,
     random_state: int = 42,
-):
+) -> dict:
     """
     Compute binary classification metrics given true labels and predicted scores.
     
-    labels: array-like of 0/1 labels
-    scores: array-like of predicted probabilities after sigmoid
+    Parameters
+    ----------
+    labels : array-like
+        True binary labels (0 or 1).
+    scores : array-like
+        Predicted scores or probabilities.
+    score_threshold : float
+        Threshold to convert predicted scores into binary predictions (default: 0.5).
+    random_state : int
+        Random seed for reproducibility (default: 42).
+        
+    Returns
+    -------
+    dict
+        Dictionary containing computed metrics:
+        - "auroc": Area Under the Receiver Operating Characteristic Curve.
+        - "auprc": Area Under the Precision-Recall Curve.
+        - "rand_auroc": AUROC for random predictions.
+        - "rand_auprc": AUPRC for random predictions.
+        - "accuracy": Accuracy of predictions.
+        - "precision": Precision of predictions.
+        - "early_precision": Precision for the top 10,000 predictions.
+        - "recall": Recall of predictions.
+        - "f1": F1 score of predictions.
+        - "n_edges": Total number of samples.
+        - "n_pos": Number of positive samples.
+        - "n_neg": Number of negative samples.
     """
 
     labels = np.asarray(labels).astype(int).ravel()

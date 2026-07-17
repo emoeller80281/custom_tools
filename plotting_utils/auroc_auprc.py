@@ -12,6 +12,18 @@ from sklearn.metrics import (
 def _create_random_distribution(scores, seed: int = 42) -> np.ndarray:
     """
     Create a random distribution of scores with the same shape as the input scores.
+    
+    Parameters
+    ----------
+    scores : array-like
+        Input scores to match the shape of.
+    seed : int
+        Random seed for reproducibility (default: 42).
+        
+    Returns
+    -------
+    np.ndarray
+        Randomly generated scores with the same shape as the input scores.
     """
     rng = np.random.default_rng(seed)
     arr = np.asarray(scores)   # works for Series or ndarray, no copy if already ndarray
@@ -28,13 +40,29 @@ def plot_auroc_auprc(
     plot_type: Literal["both", "roc", "prc"] = "both",
 ) -> plt.Figure:
     """
-    labels: array-like of 0/1 labels
-    scores: array-like of predicted probabilities after sigmoid
-
-    plot_type:
-        "both" -> plot ROC and PRC
-        "roc"  -> plot ROC only
-        "prc"  -> plot PRC only
+    Plot AUROC and AUPRC curves for binary classification.
+        
+    Parameters
+    ----------
+    labels : array-like
+        True binary labels (0 or 1).
+    scores : array-like
+        Predicted scores or probabilities.
+    roc_line_color : str
+        Color for the ROC curve line.
+    prc_line_color : str
+        Color for the PRC curve line.
+    rand_line_color : str
+        Color for the random baseline line.
+    title : str, optional
+        Title for the figure. If None, no title is set.
+    plot_type : str
+        Type of plot to generate. Options are "both" (default), "roc", or "prc".
+        
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The generated figure containing the plots.
     """
 
     if plot_type not in {"both", "roc", "prc"}:

@@ -95,6 +95,26 @@ def fetch_chip_atlas_tf_list_to_parquet(
 ):
     """
     Fetch ChIP-Atlas TF peaks for a list of transcription factors and save them to parquet files.
+    
+    Parameters
+    ----------
+    tf_list : list[str]
+        List of transcription factor names (e.g., ["CTCF", "MYC"]).
+    genome : str
+        Genome assembly (default: "mm10" for mouse).
+    out_dir : str
+        Directory to save the resulting parquet files (default: "chip_atlas_tf_parquet").
+    num_workers : int
+        Number of parallel workers for downloading (default: 10).
+    threshold : str
+        ChIP-Atlas significance threshold (default: "05").
+    timeout : int
+        Timeout in seconds for the HTTP requests (default: 120).
+        
+    Returns
+    -------
+    dict
+        Mapping of transcription factor names to any errors encountered during fetching.
     """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -139,6 +159,22 @@ def build_chip_atlas_df_from_parquet(
     parquet_dir="chip_atlas_tf_parquet",
     output_file="chip_atlas_tf_peak_edges.parquet",
 ):
+    """
+    Build a single DataFrame from all ChIP-Atlas TF parquet files and save it to a parquet file.
+    
+    Parameters
+    ----------
+    parquet_dir : str
+        Directory containing individual TF parquet files (default: "chip_atlas_tf_parquet").
+    output_file : str
+        Path to save the combined parquet file (default: "chip_atlas_tf_peak_edges.parquet").
+        
+    Returns
+    -------
+    str
+        Path to the saved combined parquet file.
+    """
+    
     parquet_dir = Path(parquet_dir)
 
     query = f"""
@@ -163,6 +199,27 @@ def create_organism_chip_atlas_file(
     tf_names: np.ndarray,
     num_workers: int = 10
     ) -> pd.DataFrame:
+    """
+    Create a parquet file and DataFrame containing all ChIP-Atlas TF-DNA interactions for a given species.
+    
+    Parameters
+    ----------
+    species : str
+        Species name (e.g., "mm10" for mouse, "hg38" for human).
+    ground_truth_dir : Path
+        Directory to save the final ChIP-Atlas parquet file.
+    tf_chip_seq_save_dir : Path
+        Directory to save individual TF parquet files.
+    tf_names : np.ndarray
+        Array of transcription factor names to fetch from ChIP-Atlas.
+    num_workers : int
+        Number of parallel workers for downloading (default: 10).
+        
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing all ChIP-Atlas TF-DNA interactions for the specified species.
+    """
     
     full_chip_atlas_path = ground_truth_dir / f"chip_atlas_{species}_all.parquet"
     

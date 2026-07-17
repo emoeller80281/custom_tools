@@ -4,7 +4,7 @@ import logging
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def download_jaspar_pfms(save_dir: str, tax_id: str = "10090", version: int = 2024, max_workers: int = 8):
+def download_jaspar_pfms(save_dir: str, tax_id: str = "10090", version: int = 2024, max_workers: int = 8) -> None:
     """
     Download all JASPAR PFMs for a given organism (e.g., mouse) via REST API.
 
@@ -18,6 +18,10 @@ def download_jaspar_pfms(save_dir: str, tax_id: str = "10090", version: int = 20
         JASPAR release version.
     max_workers : int
         Parallel download threads.
+        
+    Returns
+    -------
+    None
     """
     os.makedirs(save_dir, exist_ok=True)
 

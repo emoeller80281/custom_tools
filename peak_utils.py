@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import pybedtools
-import logging
 
 def format_individual_peak(peak_id: str) -> str:
     """
@@ -26,6 +25,7 @@ def format_individual_peak(peak_id: str) -> str:
     
     # Already in chr:start-end format or some other format, return as-is
     return peak_id
+
 
 def format_peak_dataframe(peak_ids: pd.Series|pd.Index) -> pd.DataFrame:
     """

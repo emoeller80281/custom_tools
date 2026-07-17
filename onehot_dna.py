@@ -4,9 +4,14 @@ import tqdm
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor
 
-def onehot_dna_sequence(seq):
+def onehot_dna_sequence(seq: str) -> np.ndarray:
     """
     Fast one-hot encoding for DNA sequence.
+    
+    Parameters
+    ----------
+    seq : str
+        DNA sequence consisting of characters A, C, G, T (case-insensitive).
 
     Returns
     -------
@@ -34,6 +39,7 @@ def onehot_dna_sequence(seq):
 
     return onehot
 
+
 def parse_peak(peak: str) -> tuple[str, int, int]:
     """
     Parse peak string like chr1:100-200.
@@ -53,7 +59,8 @@ def parse_peak(peak: str) -> tuple[str, int, int]:
     
     return chrom, int(start), int(end)
 
-def load_peak_sequence(genome_fasta, selected_peak):
+
+def load_peak_sequence(genome_fasta: str | Path, selected_peak: str) -> str:
     """
     Load the DNA sequence for a given peak.
 
@@ -77,7 +84,8 @@ def load_peak_sequence(genome_fasta, selected_peak):
         
     return peak_sequence
 
-def load_chrom_sizes(chromsizes_file):
+
+def load_chrom_sizes(chromsizes_file: str | Path) -> dict[str, int]:
     """
     Load chromosome sizes from a chrom.sizes file.
 
@@ -100,16 +108,32 @@ def load_chrom_sizes(chromsizes_file):
     
     return chrom_sizes
 
+
 def _centered_peak_to_onehot(
     peak_id: str,
-    genome,
+    genome: pyfaidx.Fasta,
     chrom_sizes: dict[str, int],
     flank_size: int,
     dtype=np.uint8,
     pad_out_of_bounds: bool = True,
-):
+) -> np.ndarray:
     """
     Encode one centered peak window into a one-hot DNA matrix.
+    
+    Parameters
+    ----------
+    peak_id : str
+        Peak string in the format "chrom:start-end".
+    genome : pyfaidx.Fasta
+        Opened genome fasta file.
+    chrom_sizes : dict[str, int]
+        Dictionary mapping chromosome names to sizes.
+    flank_size : int
+        Number of bases on each side of the peak center.
+    dtype : numpy dtype
+        Output dtype. np.uint8 is recommended for one-hot DNA.
+    pad_out_of_bounds : bool
+        Whether to pad with N if the requested window goes out of bounds.
 
     Returns
     -------
@@ -180,15 +204,31 @@ def _centered_peak_to_onehot(
 
 
 def _init_genome_handle(genome_fasta: str) -> None:
+    """
+    Initialize a global genome handle for multiprocessing workers.
+    
+    Parameters
+    ----------
+    genome_fasta : str
+        Path to the genome fasta file.
+    """
     global _GENOME_HANDLE
     _GENOME_HANDLE = pyfaidx.Fasta(genome_fasta)
 
 
-def _encode_peak_chunk(args):
+def _encode_peak_chunk(args: tuple) -> list[tuple[str, np.ndarray]]:
     """
-    Worker function for multiprocessing.
-
-    Each worker opens the FASTA once per chunk, not once per peak.
+    Encode a chunk of peaks into one-hot DNA arrays for multiprocessing.
+    
+    Parameters
+    ----------
+    args : tuple
+        Tuple containing (peak_chunk, genome_fasta, chrom_sizes, flank_size, dtype, pad_out_of_bounds).
+        
+    Returns
+    -------
+    list of tuples
+        Each tuple contains (peak_id, onehot_array).
     """
     (
         peak_chunk,
@@ -217,9 +257,21 @@ def _encode_peak_chunk(args):
     return results
 
 
-def _iter_chunks(items, chunk_size: int):
+def _iter_chunks(items: np.iterable, chunk_size: int):
     """
     Yield lists of up to chunk_size items.
+    
+    Parameters
+    ----------
+    items : iterable
+        Iterable of items to chunk.
+    chunk_size : int
+        Maximum number of items per chunk.
+        
+    Yields
+    ------
+    list
+        List of items in the current chunk.
     """
     chunk = []
 

@@ -82,6 +82,18 @@ def download_gene_tss_file(
 def download_genome_fasta(organism_code: str, save_dir: Union[str, Path]) -> Path:
     """
     Download a UCSC genome FASTA, overwrite gzip with BGZF (still .gz), and index via pysam.faidx.
+    
+    Parameters
+    ----------
+    organism_code : str
+        UCSC organism code (e.g., "mm10" for mouse, "hg38" for human).
+    save_dir : Union[str, Path]
+        Directory to save the genome FASTA and index files.
+        
+    Returns
+    -------
+    Path
+        Path to the BGZF-compressed genome FASTA file.
     """
 
     save_dir = Path(save_dir)
@@ -223,6 +235,13 @@ def download_genome_fasta(organism_code: str, save_dir: Union[str, Path]) -> Pat
 def download_chrom_sizes(organism_code: str, save_dir: Union[str, Path]) -> Path:
     """
     Download UCSC chrom.sizes for an assembly (mm10 or hg38).
+    
+    Parameters
+    ----------
+    organism_code : str
+        UCSC organism code (e.g., "mm10" for mouse, "hg38" for human).
+    save_dir : Union[str, Path]
+        Directory to save the chrom.sizes file.
 
     Returns
     -------
