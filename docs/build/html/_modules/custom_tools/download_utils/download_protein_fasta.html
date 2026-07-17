@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>custom_tools.download_utils.download_protein_fasta &#8212; Custom Bioinformatics Tools 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=12dfc556" />
+    <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for custom_tools.download_utils.download_protein_fasta</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">Bio</span><span class="w"> </span><span class="kn">import</span> <span class="n">Entrez</span><span class="p">,</span> <span class="n">SeqIO</span>
+
+<div class="viewcode-block" id="download_gene_protein_fastas">
+<a class="viewcode-back" href="../../../custom_tools.download_utils.html#custom_tools.download_utils.download_protein_fasta.download_gene_protein_fastas">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">download_gene_protein_fastas</span><span class="p">(</span>
+    <span class="n">gene_names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">organism</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">email</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">api_key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">retmax</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">25</span><span class="p">,</span>
+    <span class="n">delay</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
+    <span class="n">max_tries</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+    <span class="n">sleep_between_tries</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">15</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Download one representative RefSeq protein FASTA per gene.</span>
+
+<span class="sd">    Saves:</span>
+<span class="sd">        output_dir/{gene_name}_protein.fasta</span>
+
+<span class="sd">    Uses a delay between genes to avoid NCBI rate-limit issues.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    gene_names : list[str]</span>
+<span class="sd">        List of gene names to download.</span>
+<span class="sd">    organism : str</span>
+<span class="sd">        Organism name (e.g., &quot;Mus musculus&quot;).</span>
+<span class="sd">    output_dir : str | Path</span>
+<span class="sd">        Directory to save FASTA files.</span>
+<span class="sd">    email : str</span>
+<span class="sd">        Email address for NCBI Entrez API.</span>
+<span class="sd">    api_key : str | None</span>
+<span class="sd">        Optional NCBI Entrez API key for higher rate limits.</span>
+<span class="sd">    retmax : int</span>
+<span class="sd">        Maximum number of records to fetch per gene (default: 25).</span>
+<span class="sd">    delay : float</span>
+<span class="sd">        Delay in seconds between processing each gene (default: 0.5).</span>
+<span class="sd">    max_tries : int</span>
+<span class="sd">        Maximum number of retries for Entrez requests (default: 3).</span>
+<span class="sd">    sleep_between_tries : float</span>
+<span class="sd">        Seconds to sleep between retries (default: 15).</span>
+<span class="sd">        </span>
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict</span>
+<span class="sd">        Mapping of gene_name -&gt; Path to saved FASTA file (or None if failed).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">output_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">output_dir</span><span class="p">)</span>
+    <span class="n">output_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">Entrez</span><span class="o">.</span><span class="n">email</span> <span class="o">=</span> <span class="n">email</span>
+    <span class="n">Entrez</span><span class="o">.</span><span class="n">max_tries</span> <span class="o">=</span> <span class="n">max_tries</span>
+    <span class="n">Entrez</span><span class="o">.</span><span class="n">sleep_between_tries</span> <span class="o">=</span> <span class="n">sleep_between_tries</span>
+
+    <span class="k">if</span> <span class="n">api_key</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">Entrez</span><span class="o">.</span><span class="n">api_key</span> <span class="o">=</span> <span class="n">api_key</span>
+
+    <span class="n">saved_files</span> <span class="o">=</span> <span class="p">{}</span>
+    
+    <span class="c1"># Check if the gene names are already downloaded to avoid unnecessary API calls</span>
+    <span class="n">available_files</span> <span class="o">=</span> <span class="p">{</span><span class="n">f</span><span class="o">.</span><span class="n">stem</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_protein&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">):</span> <span class="n">f</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">output_dir</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;*_protein.fasta&quot;</span><span class="p">)}</span>
+    <span class="n">gene_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">gene</span> <span class="k">for</span> <span class="n">gene</span> <span class="ow">in</span> <span class="n">gene_names</span> <span class="k">if</span> <span class="n">gene</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">available_files</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">gene_names</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;All gene FASTA files already exist. No downloads needed.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">gene</span><span class="p">:</span> <span class="n">available_files</span><span class="p">[</span><span class="n">gene</span><span class="p">]</span> <span class="k">for</span> <span class="n">gene</span> <span class="ow">in</span> <span class="n">gene_names</span><span class="p">}</span>
+    
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">gene_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">gene_names</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">search_term</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">gene_name</span><span class="si">}</span><span class="s1">[Gene Name] &#39;</span>
+            <span class="sa">f</span><span class="s1">&#39;AND </span><span class="si">{</span><span class="n">organism</span><span class="si">}</span><span class="s1">[Organism] &#39;</span>
+            <span class="sa">f</span><span class="s1">&#39;AND srcdb_refseq[PROP]&#39;</span>
+        <span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">Entrez</span><span class="o">.</span><span class="n">esearch</span><span class="p">(</span>
+                <span class="n">db</span><span class="o">=</span><span class="s2">&quot;protein&quot;</span><span class="p">,</span>
+                <span class="n">term</span><span class="o">=</span><span class="n">search_term</span><span class="p">,</span>
+                <span class="n">retmax</span><span class="o">=</span><span class="n">retmax</span><span class="p">,</span>
+            <span class="p">)</span> <span class="k">as</span> <span class="n">search_handle</span><span class="p">:</span>
+                <span class="n">search_results</span> <span class="o">=</span> <span class="n">Entrez</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">search_handle</span><span class="p">)</span>
+
+            <span class="n">protein_ids</span> <span class="o">=</span> <span class="n">search_results</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;IdList&quot;</span><span class="p">,</span> <span class="p">[])</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">protein_ids</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">gene_names</span><span class="p">)</span><span class="si">}</span><span class="s2">] No records found for </span><span class="si">{</span><span class="n">gene_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">saved_files</span><span class="p">[</span><span class="n">gene_name</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">delay</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="k">with</span> <span class="n">Entrez</span><span class="o">.</span><span class="n">efetch</span><span class="p">(</span>
+                <span class="n">db</span><span class="o">=</span><span class="s2">&quot;protein&quot;</span><span class="p">,</span>
+                <span class="nb">id</span><span class="o">=</span><span class="n">protein_ids</span><span class="p">,</span>
+                <span class="n">rettype</span><span class="o">=</span><span class="s2">&quot;gb&quot;</span><span class="p">,</span>
+                <span class="n">retmode</span><span class="o">=</span><span class="s2">&quot;text&quot;</span><span class="p">,</span>
+            <span class="p">)</span> <span class="k">as</span> <span class="n">fetch_handle</span><span class="p">:</span>
+                <span class="n">records</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">SeqIO</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">fetch_handle</span><span class="p">,</span> <span class="s2">&quot;genbank&quot;</span><span class="p">))</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">records</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">gene_names</span><span class="p">)</span><span class="si">}</span><span class="s2">] Could not parse records for </span><span class="si">{</span><span class="n">gene_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">saved_files</span><span class="p">[</span><span class="n">gene_name</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">delay</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="k">def</span><span class="w"> </span><span class="nf">protein_rank</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+                <span class="n">accession</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">id</span>
+                <span class="n">description</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">description</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+                <span class="n">keywords</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">record</span><span class="o">.</span><span class="n">annotations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;keywords&quot;</span><span class="p">,</span> <span class="p">[])]</span>
+
+                <span class="n">is_refseq_select</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="s2">&quot;refseq select&quot;</span> <span class="ow">in</span> <span class="n">description</span>
+                    <span class="ow">or</span> <span class="s2">&quot;refseq select&quot;</span> <span class="ow">in</span> <span class="n">keywords</span>
+                <span class="p">)</span>
+
+                <span class="n">is_np</span> <span class="o">=</span> <span class="n">accession</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;NP_&quot;</span><span class="p">)</span>
+                <span class="n">is_xp</span> <span class="o">=</span> <span class="n">accession</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;XP_&quot;</span><span class="p">)</span>
+                <span class="n">is_low_quality</span> <span class="o">=</span> <span class="s2">&quot;low quality protein&quot;</span> <span class="ow">in</span> <span class="n">description</span>
+
+                <span class="k">return</span> <span class="p">(</span>
+                    <span class="ow">not</span> <span class="n">is_refseq_select</span><span class="p">,</span>
+                    <span class="ow">not</span> <span class="n">is_np</span><span class="p">,</span>
+                    <span class="n">is_xp</span><span class="p">,</span>
+                    <span class="n">is_low_quality</span><span class="p">,</span>
+                    <span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">seq</span><span class="p">),</span>
+                <span class="p">)</span>
+
+            <span class="n">best_record</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">records</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">protein_rank</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="n">output_file</span> <span class="o">=</span> <span class="n">output_dir</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">gene_name</span><span class="si">}</span><span class="s2">_protein.fasta&quot;</span>
+
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">output_file</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">SeqIO</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">best_record</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="s2">&quot;fasta&quot;</span><span class="p">)</span>
+
+            <span class="n">saved_files</span><span class="p">[</span><span class="n">gene_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">output_file</span>
+
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">gene_names</span><span class="p">)</span><span class="si">}</span><span class="s2">] Saved </span><span class="si">{</span><span class="n">gene_name</span><span class="si">}</span><span class="s2">: &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">best_record</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">best_record</span><span class="o">.</span><span class="n">seq</span><span class="p">)</span><span class="si">}</span><span class="s2"> aa)&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">gene_names</span><span class="p">)</span><span class="si">}</span><span class="s2">] Failed for </span><span class="si">{</span><span class="n">gene_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">saved_files</span><span class="p">[</span><span class="n">gene_name</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">delay</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">saved_files</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">Custom Bioinformatics Tools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">custom_tools</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Eric Moeller.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 7.3.7</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

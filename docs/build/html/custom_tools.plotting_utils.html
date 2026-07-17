@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>custom_tools.plotting_utils package &#8212; Custom Bioinformatics Tools 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=12dfc556" />
+    <script src="_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="custom_tools.standardization_utils package" href="custom_tools.standardization_utils.html" />
+    <link rel="prev" title="custom_tools.download_utils package" href="custom_tools.download_utils.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="custom-tools-plotting-utils-package">
+<h1>custom_tools.plotting_utils package<a class="headerlink" href="#custom-tools-plotting-utils-package" title="Link to this heading">¶</a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading">¶</a></h2>
+</section>
+<section id="module-custom_tools.plotting_utils.auroc_auprc">
+<span id="custom-tools-plotting-utils-auroc-auprc-module"></span><h2>custom_tools.plotting_utils.auroc_auprc module<a class="headerlink" href="#module-custom_tools.plotting_utils.auroc_auprc" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="custom_tools.plotting_utils.auroc_auprc.plot_auroc_auprc">
+<span class="sig-prename descclassname"><span class="pre">custom_tools.plotting_utils.auroc_auprc.</span></span><span class="sig-name descname"><span class="pre">plot_auroc_auprc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">labels</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scores</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">roc_line_color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'#4195df'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prc_line_color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'#4195df'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rand_line_color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'#747474'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'both'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'roc'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'prc'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'both'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Figure</span></span></span><a class="reference internal" href="_modules/custom_tools/plotting_utils/auroc_auprc.html#plot_auroc_auprc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#custom_tools.plotting_utils.auroc_auprc.plot_auroc_auprc" title="Link to this definition">¶</a></dt>
+<dd><p>Plot AUROC and AUPRC curves for binary classification.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>labels</strong> (<em>array-like</em>) – True binary labels (0 or 1).</p></li>
+<li><p><strong>scores</strong> (<em>array-like</em>) – Predicted scores or probabilities.</p></li>
+<li><p><strong>roc_line_color</strong> (<em>str</em>) – Color for the ROC curve line.</p></li>
+<li><p><strong>prc_line_color</strong> (<em>str</em>) – Color for the PRC curve line.</p></li>
+<li><p><strong>rand_line_color</strong> (<em>str</em>) – Color for the random baseline line.</p></li>
+<li><p><strong>title</strong> (<em>str</em><em>, </em><em>optional</em>) – Title for the figure. If None, no title is set.</p></li>
+<li><p><strong>plot_type</strong> (<em>str</em>) – Type of plot to generate. Options are “both” (default), “roc”, or “prc”.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The generated figure containing the plots.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>matplotlib.figure.Figure</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-custom_tools.plotting_utils.histograms">
+<span id="custom-tools-plotting-utils-histograms-module"></span><h2>custom_tools.plotting_utils.histograms module<a class="headerlink" href="#module-custom_tools.plotting_utils.histograms" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="custom_tools.plotting_utils.histograms.plot_score_histograms">
+<span class="sig-prename descclassname"><span class="pre">custom_tools.plotting_utils.histograms.</span></span><span class="sig-name descname"><span class="pre">plot_score_histograms</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">labels</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scores</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_bins</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">75</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">random_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">42</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">panel_kind</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'kde'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">density</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_lim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_lim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">balance_pos_neg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/custom_tools/plotting_utils/histograms.html#plot_score_histograms"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#custom_tools.plotting_utils.histograms.plot_score_histograms" title="Link to this definition">¶</a></dt>
+<dd><p>Plot histograms or KDEs of predicted scores for true and false labels.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>labels</strong> (<em>array-like</em>) – True binary labels (0 or 1).</p></li>
+<li><p><strong>scores</strong> (<em>array-like</em>) – Predicted scores or probabilities.</p></li>
+<li><p><strong>n_bins</strong> (<em>int</em>) – Number of bins for the histogram (default: 75).</p></li>
+<li><p><strong>random_state</strong> (<em>int</em>) – Random seed for reproducibility (default: 42).</p></li>
+<li><p><strong>y_log</strong> (<em>bool</em>) – Whether to use a logarithmic scale for the y-axis (default: False).</p></li>
+<li><p><strong>panel_kind</strong> (<em>str</em>) – Type of plot to generate: “hist” for histogram, “kde” for kernel density estimate (default: “kde”).</p></li>
+<li><p><strong>density</strong> (<em>bool</em>) – Whether to normalize the histogram to form a probability density (default: False).</p></li>
+<li><p><strong>title</strong> (<em>str</em><em>, </em><em>optional</em>) – Title for the figure. If None, no title is set.</p></li>
+<li><p><strong>y_lim</strong> (<em>tuple</em><em>, </em><em>optional</em>) – Limits for the y-axis (min, max). If None, automatic limits are used.</p></li>
+<li><p><strong>x_lim</strong> (<em>tuple</em><em>, </em><em>optional</em>) – Limits for the x-axis (min, max). If None, automatic limits are used.</p></li>
+<li><p><strong>balance_pos_neg</strong> (<em>bool</em>) – Whether to balance the number of positive and negative examples by downsampling the majority class (default: True).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The generated figure object.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>matplotlib.figure.Figure</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-custom_tools.plotting_utils">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-custom_tools.plotting_utils" title="Link to this heading">¶</a></h2>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">Custom Bioinformatics Tools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">custom_tools</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="custom_tools.html">custom_tools package</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  <li><a href="modules.html">custom_tools</a><ul>
+  <li><a href="custom_tools.html">custom_tools package</a><ul>
+      <li>Previous: <a href="custom_tools.download_utils.html" title="previous chapter">custom_tools.download_utils package</a></li>
+      <li>Next: <a href="custom_tools.standardization_utils.html" title="next chapter">custom_tools.standardization_utils package</a></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Eric Moeller.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 7.3.7</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+      |
+      <a href="_sources/custom_tools.plotting_utils.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

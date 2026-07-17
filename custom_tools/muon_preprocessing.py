@@ -76,6 +76,7 @@ def filter_to_human(mdata):
 
     return mdata
 
+
 def create_fragment_index_file(frag_path: Path) -> str:
     """
     Create a tabix index file for a fragments.tsv.gz file if it doesn't already exist.
@@ -105,6 +106,7 @@ def create_fragment_index_file(frag_path: Path) -> str:
         index_file = str(frag_path) + ".tbi"
     
     return index_file
+
 
 def construct_mdata_from_gene_by_cell_matrices(rna_count_file: Path, atac_count_file: Path) -> mu.MuData:
     """
@@ -221,6 +223,7 @@ def load_raw_data(
         else:
             raise FileNotFoundError(f"Could not find the necessary files to load the data for sample {sample_name} in {sample_data_dir}. Please ensure that the sample directory contains either a raw h5 file or the 10x mtx files (barcodes.tsv.gz, features.tsv.gz, matrix.mtx.gz).")
 
+
 def normalize_peak_format(peak_id: str) -> str:
     """
     Normalize peak format from chrN-start-end or chrN:start:end to chrN:start-end.
@@ -244,6 +247,7 @@ def normalize_peak_format(peak_id: str) -> str:
     
     # Already in chr:start-end format or some other format, return as-is
     return peak_id
+
 
 class MudataProcessor:
     def __init__(
@@ -840,6 +844,7 @@ class MudataProcessor:
         
     def save_atac(self):
         mu.write(self.processed_data_dir / self.sample_name / f"{self.sample_name}.h5mu/atac", self.atac)
+     
             
 def integrate_rna_atac(
     mdata: ad.AnnData, 
@@ -929,6 +934,7 @@ def integrate_rna_atac(
     sc.tl.rank_genes_groups(mdata['rna'], 'leiden_joint', method='t-test_overestim_var')
     ac.tl.rank_peaks_groups(mdata['atac'], 'leiden_joint', method='t-test_overestim_var')
     
+    
 def save_processed_data(mdata: ad.AnnData, sample_processed_data_dir: Path):
     def _adata_to_feature_by_cell_df(adata: ad.AnnData) -> pd.DataFrame:
         """
@@ -984,6 +990,7 @@ def save_processed_data(mdata: ad.AnnData, sample_processed_data_dir: Path):
 
     # Save the full MuData object 
     mdata.write(mdata_file) 
+    
     
 def create_metacells(
     mdata: ad.AnnData, 
@@ -1092,12 +1099,14 @@ def create_metacells(
     pseudo_bulk_rna_df.to_parquet(pseudobulk_rna_file, engine="pyarrow", compression="snappy")
     pseudo_bulk_atac_df.to_parquet(pseudobulk_atac_file, engine="pyarrow", compression="snappy")
     
+    
 def get_threshold(sample_filtering_settings, setting_name, verbose=True):
     setting_value = sample_filtering_settings[setting_name].values[0]
     if verbose:
         logging.info(f"{setting_name}: {setting_value}")
     
     return setting_value
+    
     
 if __name__ == "__main__":
     args = parse_args()

@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>custom_tools.standardization_utils.gene_canonicalizer &#8212; Custom Bioinformatics Tools 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=12dfc556" />
+    <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+    <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for custom_tools.standardization_utils.gene_canonicalizer</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">unicodedata</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">gzip</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mygene</span><span class="w"> </span><span class="kn">import</span> <span class="n">MyGeneInfo</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="c1"># silence common HTTP and library chatter</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;urllib3.connectionpool&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;requests&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;mygene&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+
+<span class="c1"># optionally hide generic warnings (or target a specific category if you identify it)</span>
+<span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">)</span>
+
+<span class="n">GREEK_FIX</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;α&quot;</span><span class="p">:</span><span class="s2">&quot;A&quot;</span><span class="p">,</span><span class="s2">&quot;β&quot;</span><span class="p">:</span><span class="s2">&quot;B&quot;</span><span class="p">,</span><span class="s2">&quot;γ&quot;</span><span class="p">:</span><span class="s2">&quot;G&quot;</span><span class="p">,</span><span class="s2">&quot;δ&quot;</span><span class="p">:</span><span class="s2">&quot;D&quot;</span><span class="p">,</span><span class="s2">&quot;ε&quot;</span><span class="p">:</span><span class="s2">&quot;E&quot;</span><span class="p">,</span><span class="s2">&quot;ζ&quot;</span><span class="p">:</span><span class="s2">&quot;Z&quot;</span><span class="p">,</span><span class="s2">&quot;η&quot;</span><span class="p">:</span><span class="s2">&quot;H&quot;</span><span class="p">,</span><span class="s2">&quot;θ&quot;</span><span class="p">:</span><span class="s2">&quot;TH&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;ι&quot;</span><span class="p">:</span><span class="s2">&quot;I&quot;</span><span class="p">,</span><span class="s2">&quot;κ&quot;</span><span class="p">:</span><span class="s2">&quot;K&quot;</span><span class="p">,</span><span class="s2">&quot;λ&quot;</span><span class="p">:</span><span class="s2">&quot;L&quot;</span><span class="p">,</span><span class="s2">&quot;μ&quot;</span><span class="p">:</span><span class="s2">&quot;M&quot;</span><span class="p">,</span><span class="s2">&quot;ν&quot;</span><span class="p">:</span><span class="s2">&quot;N&quot;</span><span class="p">,</span><span class="s2">&quot;ξ&quot;</span><span class="p">:</span><span class="s2">&quot;X&quot;</span><span class="p">,</span><span class="s2">&quot;ο&quot;</span><span class="p">:</span><span class="s2">&quot;O&quot;</span><span class="p">,</span><span class="s2">&quot;π&quot;</span><span class="p">:</span><span class="s2">&quot;P&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;ρ&quot;</span><span class="p">:</span><span class="s2">&quot;R&quot;</span><span class="p">,</span><span class="s2">&quot;σ&quot;</span><span class="p">:</span><span class="s2">&quot;S&quot;</span><span class="p">,</span><span class="s2">&quot;τ&quot;</span><span class="p">:</span><span class="s2">&quot;T&quot;</span><span class="p">,</span><span class="s2">&quot;υ&quot;</span><span class="p">:</span><span class="s2">&quot;Y&quot;</span><span class="p">,</span><span class="s2">&quot;φ&quot;</span><span class="p">:</span><span class="s2">&quot;PH&quot;</span><span class="p">,</span><span class="s2">&quot;χ&quot;</span><span class="p">:</span><span class="s2">&quot;CH&quot;</span><span class="p">,</span><span class="s2">&quot;ψ&quot;</span><span class="p">:</span><span class="s2">&quot;PS&quot;</span><span class="p">,</span><span class="s2">&quot;ω&quot;</span><span class="p">:</span><span class="s2">&quot;O&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;κ&quot;</span><span class="p">:</span><span class="s2">&quot;K&quot;</span><span class="p">,</span><span class="s2">&quot;Κ&quot;</span><span class="p">:</span><span class="s2">&quot;K&quot;</span><span class="p">,</span><span class="s2">&quot;Ω&quot;</span><span class="p">:</span><span class="s2">&quot;O&quot;</span><span class="p">,</span><span class="s2">&quot;Λ&quot;</span><span class="p">:</span><span class="s2">&quot;L&quot;</span>
+<span class="p">}</span>
+
+<span class="n">_MONTH2PREFIX</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;SEP&quot;</span><span class="p">:</span>  <span class="s2">&quot;SEPT&quot;</span><span class="p">,</span>   <span class="c1"># SEPT1..SEPT14</span>
+    <span class="s2">&quot;MAR&quot;</span><span class="p">:</span>  <span class="s2">&quot;MARCH&quot;</span><span class="p">,</span>  <span class="c1"># MARCH1..MARCH11</span>
+    <span class="c1"># Add more only if you have clear one-to-one mappings; most others are ambiguous.</span>
+<span class="p">}</span>
+
+<span class="n">_date_pat</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^(\d{1,2})-(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)$&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">IGNORECASE</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_deexcelize_symbol</span><span class="p">(</span><span class="n">sym</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert Excel-style date symbols to a standard format.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    sym : str</span>
+<span class="sd">        The symbol to convert.</span>
+<span class="sd">        </span>
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str</span>
+<span class="sd">        The converted symbol.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">sym</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">_date_pat</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">upper</span><span class="p">())</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">m</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">s</span>
+    <span class="n">num</span><span class="p">,</span> <span class="n">mon</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">mon</span> <span class="ow">in</span> <span class="n">_MONTH2PREFIX</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">_MONTH2PREFIX</span><span class="p">[</span><span class="n">mon</span><span class="p">]</span><span class="si">}{</span><span class="nb">int</span><span class="p">(</span><span class="n">num</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>  <span class="c1"># e.g., 1-SEP -&gt; SEPT1, 10-SEP -&gt; SEPT10, 1-MAR -&gt; MARCH1</span>
+    <span class="c1"># ambiguous months: leave unchanged</span>
+    <span class="k">return</span> <span class="n">s</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_asciify</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert unicode characters to ASCII equivalents.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    s : str</span>
+<span class="sd">        The string to convert.</span>
+<span class="sd">        </span>
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str</span>
+<span class="sd">        The converted string.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># strip accents &amp; convert common unicode to ascii-ish</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">GREEK_FIX</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ch</span><span class="p">,</span> <span class="n">ch</span><span class="p">)</span> <span class="k">for</span> <span class="n">ch</span> <span class="ow">in</span> <span class="n">s</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">unicodedata</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="s2">&quot;NFKD&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;ascii&quot;</span><span class="p">,</span> <span class="s2">&quot;ignore&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;ascii&quot;</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_norm_symbol</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Normalize a gene symbol by stripping whitespace and converting to uppercase.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    s : str</span>
+<span class="sd">        The symbol to normalize.</span>
+<span class="sd">        </span>
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str</span>
+<span class="sd">        The normalized symbol.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">s</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">pd</span><span class="o">.</span><span class="n">isna</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">s</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">_asciify</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">_deexcelize_symbol</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;NF-kB&quot;</span><span class="p">,</span><span class="s2">&quot;NFKB&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;NF-kappaB&quot;</span><span class="p">,</span><span class="s2">&quot;NFKB&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;NF-kB1&quot;</span><span class="p">,</span><span class="s2">&quot;NFKB1&quot;</span><span class="p">)</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;NF-kB2&quot;</span><span class="p">,</span><span class="s2">&quot;NFKB2&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;NF-kB p65&quot;</span><span class="p">,</span><span class="s2">&quot;RELA&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;NF-kB p50&quot;</span><span class="p">,</span><span class="s2">&quot;NFKB1&quot;</span><span class="p">)</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">,</span><span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">,</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">s</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_split_synonyms</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Split a string of gene synonyms into a list of individual synonyms.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    s : str</span>
+<span class="sd">        The string of synonyms to split.</span>
+<span class="sd">        </span>
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    list[str]</span>
+<span class="sd">        A list of individual synonyms.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">pd</span><span class="o">.</span><span class="n">isna</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">str</span><span class="p">(</span><span class="n">s</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+        <span class="k">return</span> <span class="p">[]</span>
+    <span class="c1"># NCBI uses | between synonyms; also split commas if present</span>
+    <span class="n">parts</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;[|,;/]&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">s</span><span class="p">))</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">parts</span> <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="ow">and</span> <span class="n">p</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">&quot;-&quot;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="GeneCanonicalizer">
+<a class="viewcode-back" href="../../../custom_tools.standardization_utils.html#custom_tools.standardization_utils.gene_canonicalizer.GeneCanonicalizer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GeneCanonicalizer</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Canonicalizes gene identifiers (Ensembl, Entrez, aliases) to a preferred symbol</span>
+<span class="sd">    using local files (GTF + NCBI/MGI gene_info). Species-agnostic; pass the correct files.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    species : str</span>
+<span class="sd">        Species identifier (e.g., &quot;10090&quot; for mouse, &quot;9606&quot; for human).</span>
+<span class="sd">    use_mygene : bool</span>
+<span class="sd">        Whether to use MyGene.info for fallback symbol resolution (default: True).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">species</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;10090&quot;</span><span class="p">,</span> <span class="n">use_mygene</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ens2sym</span> <span class="o">=</span> <span class="p">{}</span>      <span class="c1"># ENSMUSG000000... -&gt; OFFICIAL_SYMBOL</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">entrez2sym</span> <span class="o">=</span> <span class="p">{}</span>   <span class="c1"># 12345 -&gt; OFFICIAL_SYMBOL</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">alias2sym</span> <span class="o">=</span> <span class="p">{}</span>    <span class="c1"># ALIAS -&gt; OFFICIAL_SYMBOL</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sym_ok</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>    <span class="c1"># known official symbols</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">species</span> <span class="o">=</span> <span class="n">species</span>  <span class="c1"># &quot;mouse&quot;/&quot;human&quot; or &quot;10090&quot;/&quot;9606&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">use_mygene</span> <span class="o">=</span> <span class="n">use_mygene</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mg</span> <span class="o">=</span> <span class="n">MyGeneInfo</span><span class="p">()</span> <span class="k">if</span> <span class="n">use_mygene</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># Optional: curated TF alias tweaks</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">curated</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;HIF2A&quot;</span><span class="p">:</span><span class="s2">&quot;EPAS1&quot;</span><span class="p">,</span> <span class="s2">&quot;P53&quot;</span><span class="p">:</span><span class="s2">&quot;TP53&quot;</span><span class="p">,</span> <span class="s2">&quot;P73&quot;</span><span class="p">:</span><span class="s2">&quot;TRP73&quot;</span><span class="p">,</span> <span class="s2">&quot;P63&quot;</span><span class="p">:</span><span class="s2">&quot;TP63&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;NFKB&quot;</span><span class="p">:</span><span class="s2">&quot;NFKB1&quot;</span><span class="p">,</span> <span class="s2">&quot;NFKB P65&quot;</span><span class="p">:</span><span class="s2">&quot;RELA&quot;</span><span class="p">,</span> <span class="s2">&quot;NFKB P50&quot;</span><span class="p">:</span><span class="s2">&quot;NFKB1&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;MYC/MAX&quot;</span><span class="p">:</span><span class="s2">&quot;MYC&quot;</span>
+        <span class="p">}</span>
+
+<div class="viewcode-block" id="GeneCanonicalizer.load_gtf">
+<a class="viewcode-back" href="../../../custom_tools.standardization_utils.html#custom_tools.standardization_utils.gene_canonicalizer.GeneCanonicalizer.load_gtf">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_gtf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">gtf_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Load Ensembl GTF file to build Ensembl -&gt; official symbol mapping.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        gtf_path : str</span>
+<span class="sd">            Path to the GTF file (can be gzipped).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># read only &#39;gene&#39; rows: attributes have gene_id and gene_name</span>
+        <span class="n">openf</span> <span class="o">=</span> <span class="n">gzip</span><span class="o">.</span><span class="n">open</span> <span class="k">if</span> <span class="n">gtf_path</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.gz&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="nb">open</span>
+        <span class="k">with</span> <span class="n">openf</span><span class="p">(</span><span class="n">gtf_path</span><span class="p">,</span> <span class="s2">&quot;rt&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span> <span class="ow">or</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;#&quot;</span><span class="p">):</span>
+                    <span class="k">continue</span>
+                <span class="n">cols</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">9</span> <span class="ow">or</span> <span class="n">cols</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;gene&quot;</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">attrs</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">8</span><span class="p">]</span>
+                <span class="n">m_id</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;gene_id &quot;([^&quot;]+)&quot;&#39;</span><span class="p">,</span> <span class="n">attrs</span><span class="p">)</span>
+                <span class="n">m_name</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;gene_name &quot;([^&quot;]+)&quot;&#39;</span><span class="p">,</span> <span class="n">attrs</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">m_id</span> <span class="ow">and</span> <span class="n">m_name</span><span class="p">:</span>
+                    <span class="n">ens</span> <span class="o">=</span> <span class="n">m_id</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+                    <span class="n">sym</span> <span class="o">=</span> <span class="n">_norm_symbol</span><span class="p">(</span><span class="n">m_name</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+                    <span class="k">if</span> <span class="n">ens</span> <span class="ow">and</span> <span class="n">sym</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">ens2sym</span><span class="p">[</span><span class="n">ens</span><span class="p">]</span> <span class="o">=</span> <span class="n">sym</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">sym_ok</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">sym</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="GeneCanonicalizer.load_ncbi_gene_info">
+<a class="viewcode-back" href="../../../custom_tools.standardization_utils.html#custom_tools.standardization_utils.gene_canonicalizer.GeneCanonicalizer.load_ncbi_gene_info">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_ncbi_gene_info</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">gene_info_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">species_taxid</span><span class="o">=</span><span class="s2">&quot;10090&quot;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Load NCBI gene_info file to build Entrez -&gt; official symbol and alias -&gt; official symbol mappings.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        gene_info_path : str</span>
+<span class="sd">            Path to the gene_info file (can be gzipped).</span>
+<span class="sd">        species_taxid : str</span>
+<span class="sd">            NCBI taxonomy ID for the species (default: &quot;10090&quot; for mouse).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">openf</span> <span class="o">=</span> <span class="n">gzip</span><span class="o">.</span><span class="n">open</span> <span class="k">if</span> <span class="n">gene_info_path</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.gz&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="nb">open</span>
+        <span class="k">with</span> <span class="n">openf</span><span class="p">(</span><span class="n">gene_info_path</span><span class="p">,</span> <span class="s2">&quot;rt&quot;</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;ignore&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;#&quot;</span><span class="p">):</span>
+                    <span class="k">continue</span>
+                <span class="n">parts</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">6</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">tax_id</span><span class="p">,</span> <span class="n">gene_id</span><span class="p">,</span> <span class="n">symbol</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">syns</span><span class="p">,</span> <span class="n">dbxrefs</span> <span class="o">=</span> <span class="n">parts</span><span class="p">[:</span><span class="mi">6</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">tax_id</span> <span class="o">!=</span> <span class="n">species_taxid</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">sym</span> <span class="o">=</span> <span class="n">_norm_symbol</span><span class="p">(</span><span class="n">symbol</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">sym</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">sym_ok</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">sym</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">entrez2sym</span><span class="p">[</span><span class="n">gene_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">sym</span>
+                    <span class="c1"># aliases</span>
+                    <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">_split_synonyms</span><span class="p">(</span><span class="n">syns</span><span class="p">):</span>
+                        <span class="n">a2</span> <span class="o">=</span> <span class="n">_norm_symbol</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">a2</span> <span class="ow">and</span> <span class="n">a2</span> <span class="o">!=</span> <span class="n">sym</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">alias2sym</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">a2</span><span class="p">,</span> <span class="n">sym</span><span class="p">)</span>
+                <span class="c1"># dbxrefs may contain Ensembl:ENSMUSG...</span>
+                <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">_split_synonyms</span><span class="p">(</span><span class="n">dbxrefs</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;ENSEMBL:&quot;</span><span class="p">):</span>
+                        <span class="n">ens</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">,</span><span class="mi">1</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                        <span class="k">if</span> <span class="n">ens</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">ens2sym</span><span class="p">[</span><span class="n">ens</span><span class="p">]</span> <span class="o">=</span> <span class="n">sym</span></div>
+
+
+
+<div class="viewcode-block" id="GeneCanonicalizer.canonicalize_series">
+<a class="viewcode-back" href="../../../custom_tools.standardization_utils.html#custom_tools.standardization_utils.gene_canonicalizer.GeneCanonicalizer.canonicalize_series">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">canonicalize_series</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">s</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5000</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Canonicalize a pandas Series of gene identifiers to official symbols.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        s : pd.Series</span>
+<span class="sd">            Series of gene identifiers (symbols, Ensembl IDs, Entrez IDs, aliases).</span>
+<span class="sd">        batch_size : int</span>
+<span class="sd">            Batch size for MyGene.info queries (default: 5000).</span>
+<span class="sd">            </span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        pd.Series</span>
+<span class="sd">            Series of canonicalized official symbols.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="c1"># 1) normalize input</span>
+        <span class="n">s_norm</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">_norm_symbol</span><span class="p">)</span>
+
+        <span class="c1"># 2) local maps</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">s_norm</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="c1"># curated first</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">out</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">curated</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span>
+
+        <span class="c1"># already official</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">out</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span> <span class="k">if</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sym_ok</span> <span class="k">else</span> <span class="n">x</span><span class="p">)</span>
+
+        <span class="c1"># Ensembl, Entrez, alias</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">_local_map</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">x</span><span class="p">:</span>
+                <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+            <span class="k">if</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sym_ok</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">x</span>
+            <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s2">&quot;ENSMUSG&quot;</span><span class="p">,</span> <span class="s2">&quot;ENSG&quot;</span><span class="p">))</span> <span class="ow">and</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ens2sym</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ens2sym</span><span class="p">[</span><span class="n">x</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">isdigit</span><span class="p">()</span> <span class="ow">and</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">entrez2sym</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">entrez2sym</span><span class="p">[</span><span class="n">x</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">alias2sym</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">alias2sym</span><span class="p">[</span><span class="n">x</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">x</span>
+
+        <span class="n">out</span> <span class="o">=</span> <span class="n">out</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">_local_map</span><span class="p">)</span>
+
+        <span class="c1"># 3) MyGene fallback (batched) for anything still unmapped</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_mygene</span><span class="p">:</span>
+            <span class="n">unresolved</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">({</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">out</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span> <span class="k">if</span> <span class="n">x</span> <span class="ow">and</span> <span class="n">x</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sym_ok</span>
+                                <span class="ow">and</span> <span class="ow">not</span> <span class="n">x</span><span class="o">.</span><span class="n">isdigit</span><span class="p">()</span>
+                                <span class="ow">and</span> <span class="ow">not</span> <span class="n">x</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s2">&quot;ENSMUSG&quot;</span><span class="p">,</span> <span class="s2">&quot;ENSG&quot;</span><span class="p">))</span>
+                                <span class="ow">and</span> <span class="n">x</span> <span class="o">==</span> <span class="n">_local_map</span><span class="p">(</span><span class="n">x</span><span class="p">)})</span>
+            <span class="c1"># apply cache first</span>
+            <span class="n">unresolved</span> <span class="o">=</span> <span class="p">[</span><span class="n">u</span> <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> <span class="n">unresolved</span> <span class="k">if</span> <span class="n">u</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">]</span>
+
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">unresolved</span><span class="p">),</span> <span class="n">batch_size</span><span class="p">):</span>
+                <span class="n">chunk</span> <span class="o">=</span> <span class="n">unresolved</span><span class="p">[</span><span class="n">i</span><span class="p">:</span><span class="n">i</span><span class="o">+</span><span class="n">batch_size</span><span class="p">]</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mg</span><span class="o">.</span><span class="n">querymany</span><span class="p">(</span>
+                        <span class="n">chunk</span><span class="p">,</span>
+                        <span class="n">scopes</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;symbol&quot;</span><span class="p">,</span> <span class="s2">&quot;alias&quot;</span><span class="p">,</span> <span class="s2">&quot;ensembl.gene&quot;</span><span class="p">,</span> <span class="s2">&quot;entrezgene&quot;</span><span class="p">,</span> <span class="s2">&quot;uniprot&quot;</span><span class="p">],</span>
+                        <span class="n">fields</span><span class="o">=</span><span class="s2">&quot;symbol&quot;</span><span class="p">,</span>
+                        <span class="n">species</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">species</span><span class="p">,</span>
+                        <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                        <span class="n">returnall</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">res</span><span class="p">:</span>
+                            <span class="n">q</span> <span class="o">=</span> <span class="n">_norm_symbol</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;query&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">))</span>
+                            <span class="n">sym</span> <span class="o">=</span> <span class="n">_norm_symbol</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;symbol&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">))</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">r</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;notfound&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">[</span><span class="n">q</span><span class="p">]</span> <span class="o">=</span> <span class="n">sym</span> <span class="ow">or</span> <span class="n">q</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;MyGene batch failed (</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span><span class="si">}</span><span class="s2"> items): </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># fill from cache (or identity)</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="n">out</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">out</span></div>
+
+    
+    
+<div class="viewcode-block" id="GeneCanonicalizer.canonical_symbol">
+<a class="viewcode-back" href="../../../custom_tools.standardization_utils.html#custom_tools.standardization_utils.gene_canonicalizer.GeneCanonicalizer.canonical_symbol">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">canonical_symbol</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">s</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Canonicalize a single gene identifier to an official symbol.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        s : str</span>
+<span class="sd">            Gene identifier (symbol, Ensembl ID, Entrez ID, alias).</span>
+<span class="sd">            </span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        str</span>
+<span class="sd">            Canonicalized official symbol, or empty string if unmappable.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="n">s0</span> <span class="o">=</span> <span class="n">_norm_symbol</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">s0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="c1"># 2) curated overrides</span>
+        <span class="k">if</span> <span class="n">s0</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">curated</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">curated</span><span class="p">[</span><span class="n">s0</span><span class="p">]</span>
+
+        <span class="c1"># 3) already an official symbol</span>
+        <span class="k">if</span> <span class="n">s0</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sym_ok</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">s0</span>
+
+        <span class="c1"># 4) Ensembl gene ID (strip version already handled in _norm_symbol)</span>
+        <span class="k">if</span> <span class="n">s0</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s2">&quot;ENSMUSG&quot;</span><span class="p">,</span> <span class="s2">&quot;ENSG&quot;</span><span class="p">)):</span>
+            <span class="n">sym</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ens2sym</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">s0</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">sym</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">sym</span>
+
+        <span class="c1"># 5) Entrez numeric</span>
+        <span class="k">if</span> <span class="n">s0</span><span class="o">.</span><span class="n">isdigit</span><span class="p">():</span>
+            <span class="n">sym</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">entrez2sym</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">s0</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">sym</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">sym</span>
+
+        <span class="c1"># 6) alias</span>
+        <span class="n">sym</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">alias2sym</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">s0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sym</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">sym</span>
+
+        <span class="c1"># 7) tiny heuristic</span>
+        <span class="k">if</span> <span class="s2">&quot;NFKB&quot;</span> <span class="ow">in</span> <span class="n">s0</span> <span class="ow">and</span> <span class="n">s0</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">alias2sym</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">alias2sym</span><span class="p">[</span><span class="n">s0</span><span class="p">]</span>
+
+        <span class="c1"># 8) optional MyGene fallback</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_mygene</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">s0</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">[</span><span class="n">s0</span><span class="p">]</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mg</span><span class="o">.</span><span class="n">querymany</span><span class="p">(</span>
+                    <span class="p">[</span><span class="n">s0</span><span class="p">],</span>
+                    <span class="n">scopes</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;symbol&quot;</span><span class="p">,</span> <span class="s2">&quot;alias&quot;</span><span class="p">,</span> <span class="s2">&quot;ensembl.gene&quot;</span><span class="p">,</span> <span class="s2">&quot;entrezgene&quot;</span><span class="p">,</span> <span class="s2">&quot;uniprot&quot;</span><span class="p">],</span>
+                    <span class="n">fields</span><span class="o">=</span><span class="s2">&quot;symbol&quot;</span><span class="p">,</span>
+                    <span class="n">species</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">species</span><span class="p">,</span>
+                    <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                    <span class="n">returnall</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">sym</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+                <span class="k">if</span> <span class="n">res</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                    <span class="n">r</span> <span class="o">=</span> <span class="n">res</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">r</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;notfound&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">r</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;symbol&quot;</span><span class="p">):</span>
+                        <span class="n">sym</span> <span class="o">=</span> <span class="n">_norm_symbol</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="s2">&quot;symbol&quot;</span><span class="p">])</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">[</span><span class="n">s0</span><span class="p">]</span> <span class="o">=</span> <span class="n">sym</span> <span class="ow">or</span> <span class="n">s0</span>  <span class="c1"># fall back to s0 if still unknown</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">[</span><span class="n">s0</span><span class="p">]</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="c1"># stay deterministic if network hiccups</span>
+                <span class="k">return</span> <span class="n">s0</span>
+
+        <span class="c1"># fallback: return normalized original</span>
+        <span class="k">return</span> <span class="n">s0</span></div>
+
+
+
+<div class="viewcode-block" id="GeneCanonicalizer.standardize_df">
+<a class="viewcode-back" href="../../../custom_tools.standardization_utils.html#custom_tools.standardization_utils.gene_canonicalizer.GeneCanonicalizer.standardize_df">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">standardize_df</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">tf_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">tg_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Canonicalize gene identifiers in a DataFrame.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        df : pd.DataFrame</span>
+<span class="sd">            Input DataFrame.</span>
+<span class="sd">        tf_col : str</span>
+<span class="sd">            Column name for transcription factors.</span>
+<span class="sd">        tg_col : str</span>
+<span class="sd">            Column name for target genes.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        pd.DataFrame</span>
+<span class="sd">            DataFrame with canonicalized gene identifiers.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="n">tf_col</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">canonicalize_series</span><span class="p">(</span><span class="n">out</span><span class="p">[</span><span class="n">tf_col</span><span class="p">])</span>
+        <span class="n">out</span><span class="p">[</span><span class="n">tg_col</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">canonicalize_series</span><span class="p">(</span><span class="n">out</span><span class="p">[</span><span class="n">tg_col</span><span class="p">])</span>
+        <span class="n">before</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">out</span><span class="p">[(</span><span class="n">out</span><span class="p">[</span><span class="n">tf_col</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">out</span><span class="p">[</span><span class="n">tg_col</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">)]</span>
+        <span class="n">dropped</span> <span class="o">=</span> <span class="n">before</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dropped</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[Canonicalizer] Dropped </span><span class="si">{</span><span class="n">dropped</span><span class="si">}</span><span class="s2"> rows with empty/unmappable TF/TG&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">out</span></div>
+
+
+
+<div class="viewcode-block" id="GeneCanonicalizer.coverage_report">
+<a class="viewcode-back" href="../../../custom_tools.standardization_utils.html#custom_tools.standardization_utils.gene_canonicalizer.GeneCanonicalizer.coverage_report">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">coverage_report</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate a coverage report for the canonicalizer.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict</span>
+<span class="sd">            Dictionary containing coverage statistics.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;n_official&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sym_ok</span><span class="p">),</span>
+            <span class="s2">&quot;n_ens2sym&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ens2sym</span><span class="p">),</span>
+            <span class="s2">&quot;n_entrez2sym&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">entrez2sym</span><span class="p">),</span>
+            <span class="s2">&quot;n_alias2sym&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">alias2sym</span><span class="p">),</span>
+        <span class="p">}</span></div>
+</div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">Custom Bioinformatics Tools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">custom_tools</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Eric Moeller.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 7.3.7</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
