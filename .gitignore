@@ -1,1 +1,6 @@
 __pycache__/
+
+# Ignore the downloads from building the NCBI datasets API
+python_lib
+*.yaml
+*.jar

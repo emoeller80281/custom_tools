@@ -1,0 +1,58 @@
+# Conda environment for the custom_tools package (Eric Moeller).
+#
+# This library is not pip-installed; it's used by putting the repo root on
+# PYTHONPATH/sys.path (see docs/source/conf.py). Create the environment and then
+# add the repo root to your path, e.g.:
+#
+#     conda env create -f environment.yml
+#     conda activate custom_tools
+#     conda develop /gpfs/Home/esm5360/general_code/custom_tools   # or set PYTHONPATH
+#
+# Package set derived from the imports actually used by the current tree
+# (build_pkn, download_utils, standardization_utils, stat_utils, plotting_utils,
+# ncbi_openapi_utils). The single-cell stack (muon/scanpy/anndata) is intentionally
+# omitted — those modules are not present in the current tree.
+name: custom_tools
+
+channels:
+  - conda-forge
+  - bioconda
+
+dependencies:
+  # --- core language / build ---
+  - python=3.12
+  - pip
+  - setuptools
+
+  # --- scientific / dataframe stack ---
+  - numpy
+  - pandas
+  - scikit-learn
+  - networkx
+  - joblib
+  - duckdb
+
+  # --- plotting ---
+  - matplotlib
+  - seaborn
+
+  # --- HTTP / parsing / utilities ---
+  - requests
+  - urllib3
+  - beautifulsoup4
+  - lxml            # xml parser backend used by BeautifulSoup(..., "xml")
+  - tqdm
+  - python-dateutil
+  - typing-extensions
+  - pydantic>=2     # required by the generated ncbi.datasets.openapi lib
+
+  # --- bioinformatics (bioconda) ---
+  - pysam           # indexed FASTA / tabix / faidx
+  - biopython       # Bio.* (NCBI Entrez protein FASTA download)
+
+  # --- pip-only genomics/API wrappers ---
+  - pip:
+      - pybiomart     # Ensembl BioMart TSS / gene info
+      - bioservices   # KEGG REST client (build_pkn)
+      - mygene        # MyGene.info gene canonicalization
+      - ipykernel
